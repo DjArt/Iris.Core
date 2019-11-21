@@ -1,4 +1,6 @@
 ﻿using EmptyBox.IO.Network;
+using EmptyBox.IO.Network.Help;
+using EmptyBox.ScriptRuntime.Results;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -6,46 +8,79 @@ using System.Threading.Tasks;
 
 namespace Iris.Core.Network
 {
-    public sealed class IrisConnection : IConnection
+    public sealed class IrisConnection : APointedConnection<IrisAddress, IrisPort, IrisAccessPoint, IrisAccount>
     {
-        internal event ConnectionMessageReceiveHandler MessageSended;
+        internal event MessageReceiveHandler<IrisConnection> MessageSended;
 
-        public IConnectionProvider ConnectionProvider => throw new NotImplementedException();
+        internal bool FromListener { get; private set; }
+        internal bool Interrupted { get; set; }
 
-        public IPort Port => throw new NotImplementedException();
+        public new event MessageReceiveHandler<IrisConnection> MessageReceived;
+        public new event ConnectionInterruptHandler<IrisConnection> ConnectionInterrupted;
 
-        public IAccessPoint RemoteHost => throw new NotImplementedException();
-
-        public bool IsActive => throw new NotImplementedException();
-
-        public event ConnectionMessageReceiveHandler MessageReceived;
-        public event ConnectionInterruptHandler ConnectionInterrupt;
-
-        internal void Interrupt()
+        internal IrisConnection(IrisAccount provider, IrisAccessPoint remoteHost)
         {
-            ConnectionInterrupt?.Invoke(this);
+            ConnectionProvider = provider;
+            RemotePoint = remoteHost;
+            IsActive = false;
+            FromListener = false;
+        }
+
+        internal IrisConnection(IrisAccount provider, IrisPort port, IrisAccessPoint remoteHost) : this(provider, remoteHost)
+        {
+            LocalPoint = new IrisAccessPoint(provider.Address, port);
+            FromListener = true;
+        }
+
+        protected override void OnConnectionInterrupt()
+        {
+            ConnectionInterrupted?.Invoke(this);
+            base.OnConnectionInterrupt();
+        }
+
+        protected override void OnMessageReceive(byte[] message)
+        {
+            MessageReceived?.Invoke(this, message);
+            base.OnMessageReceive(message);
+        }
+
+        internal async void Interrupt()
+        {
+            Interrupted = true;
+            await Close();
         }
 
         internal void Receive(byte[] message)
         {
-            MessageReceived?.Invoke(this, message);
+            OnMessageReceive(message);
         }
 
-        public Task<SocketOperationStatus> Close()
+        public override async Task<VoidResult<SocketOperationStatus>> Close()
         {
-            throw new NotImplementedException();
+            OnConnectionInterrupt();
+            ConnectionProvider.ConnectionClosed(this);
+            return new VoidResult<SocketOperationStatus>(SocketOperationStatus.Success, null);
         }
 
-        public Task<SocketOperationStatus> Open()
+        public override async Task<VoidResult<SocketOperationStatus>> Open()
         {
-            throw new NotImplementedException();
+            await Task.Yield();
+            if (await ConnectionProvider.ConnectionOpened(this))
+            {
+                IsActive = true;
+                return new VoidResult<SocketOperationStatus>(SocketOperationStatus.Success, null);
+            }
+            else
+            {
+                return new VoidResult<SocketOperationStatus>(SocketOperationStatus.UnknownError, null);
+            }
         }
 
-        public async Task<SocketOperationStatus> Send(byte[] data)
+        public override async Task<VoidResult<SocketOperationStatus>> Send(byte[] data)
         {
             await Task.Yield();
             MessageSended?.Invoke(this, data);
-            return SocketOperationStatus.Success;
+            return new VoidResult<SocketOperationStatus>(SocketOperationStatus.Success, null);
         }
     }
 }

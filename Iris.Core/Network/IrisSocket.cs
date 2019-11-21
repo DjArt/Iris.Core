@@ -1,4 +1,6 @@
 ﻿using EmptyBox.IO.Network;
+using EmptyBox.IO.Network.Help;
+using EmptyBox.ScriptRuntime.Results;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -6,27 +8,52 @@ using System.Threading.Tasks;
 
 namespace Iris.Core.Network
 {
-    public sealed class IrisSocket : ISocket
+    public sealed class IrisSocket : APointedSocket<IrisAddress, IrisPort, IrisAccessPoint, IrisAccount>
     {
-        public ISocketProvider SocketProvider => throw new NotImplementedException();
+        internal event PointedSocketMessageReceiveHandler<IrisAddress, IrisPort> MessageSended;
 
-        public IPort Port => throw new NotImplementedException();
-
-        public event SocketMessageReceiveHandler MessageReceived;
-
-        public Task<SocketOperationStatus> Close()
+        internal IrisSocket(IrisAccount provider, IrisPort port)
         {
-            throw new NotImplementedException();
+            SocketProvider = provider;
+            LocalPoint = new IrisAccessPoint(provider.Address, port);
         }
 
-        public Task<SocketOperationStatus> Open()
+        internal void Receive(IrisAccessPoint sender, byte[] message)
         {
-            throw new NotImplementedException();
+            OnMessageReceive(sender, message);
         }
 
-        public Task<SocketOperationStatus> Send(IAccessPoint host, byte[] data)
+        public async override Task<VoidResult<SocketOperationStatus>> Close()
         {
-            throw new NotImplementedException();
+            IsActive = false;
+            SocketProvider.SocketClosed(this);
+            return new VoidResult<SocketOperationStatus>(SocketOperationStatus.Success, null);
+        }
+
+        public async override Task<VoidResult<SocketOperationStatus>> Open()
+        {
+            await Task.Yield();
+            if (SocketProvider.SocketOpened(this))
+            {
+                IsActive = true;
+                return new VoidResult<SocketOperationStatus>(SocketOperationStatus.Success, null);
+            }
+            else
+            {
+                return new VoidResult<SocketOperationStatus>(SocketOperationStatus.UnknownError, null);
+            }
+        }
+
+        public async Task<VoidResult<SocketOperationStatus>> Send(IAccessPoint<IrisAddress, IrisPort> receiver, byte[] data)
+        {
+            await Task.Yield();
+            MessageSended?.Invoke(this, receiver, data);
+            return new VoidResult<SocketOperationStatus>(SocketOperationStatus.Success, null);
+        }
+
+        public async override Task<VoidResult<SocketOperationStatus>> Send(IAccessPoint<IAddress, IPort> receiver, byte[] data)
+        {
+            return await Send(receiver as IAccessPoint<IrisAddress, IrisPort>, data);
         }
     }
 }

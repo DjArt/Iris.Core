@@ -7,6 +7,8 @@ namespace Iris.Core.Network
 {
     public struct IrisPort : IPort
     {
+        public const uint PORT_LENGTH = 16;
+
         public static implicit operator IrisPort(Guid guid)
         {
             return new IrisPort(guid);
