@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Iris.Core.Network
 {
-    public struct IrisAccessPoint : IAccessPoint
+    public sealed class IrisAccessPoint : IAccessPoint<IrisAddress, IrisPort>
     {
         public static implicit operator IrisAccessPoint((IrisAddress Address, IrisPort Port) pair)
         {
@@ -17,11 +17,23 @@ namespace Iris.Core.Network
             return new IrisAccessPoint(pair.Item1, pair.Item2);
         }
 
-        public IrisAddress Address { get; private set; }
-        public IrisPort Port { get; private set; }
+        public static bool operator ==(IrisAccessPoint x, IrisAccessPoint y)
+        {
+            return x.Equals(y);
+        }
 
-        IAddress IAccessPoint.Address => Address;
-        IPort IAccessPoint.Port => Port;
+        public static bool operator !=(IrisAccessPoint x, IrisAccessPoint y)
+        {
+            return !x.Equals(y);
+        }
+
+        public IrisAddress Address { get; set; }
+        public IrisPort Port { get; set; }
+
+        public IrisAccessPoint()
+        {
+
+        }
 
         public IrisAccessPoint(IrisAddress address, IrisPort port)
         {
@@ -48,7 +60,7 @@ namespace Iris.Core.Network
 
         public override string ToString()
         {
-            return Address.ToString() ;
+            return Address.ToString() + ':' + Port.ToString();
         }
     }
 }
