@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Iris.Core.Network
 {
-    public sealed class IrisConnectionListener : APointedConnectionListener<IrisAddress, IrisPort, IrisAccessPoint, IrisAccount>
+    public sealed class IrisConnectionListener : APointedConnectionListener<IrisAddress, IrisPort, IrisAccount>
     {
         internal IrisConnectionListener(IrisAccount provider, IrisPort port)
         {
@@ -22,35 +22,35 @@ namespace Iris.Core.Network
             OnConnectionReceive(connection);
         }
 
-        public override async Task<VoidResult<SocketOperationStatus>> Start()
+        public override async Task<bool> Start()
         {
             await Task.Yield();
             if (IsActive)
             {
-                return new VoidResult<SocketOperationStatus>(SocketOperationStatus.ListenerIsAlreadyStarted, null);
+                return false;
             }
             else if (ConnectionProvider.ListenerStarted(this))
             {
                 IsActive = true;
-                return new VoidResult<SocketOperationStatus>(SocketOperationStatus.Success, null);
+                return true;
             }
             else
             {
-                return new VoidResult<SocketOperationStatus>(SocketOperationStatus.ConnectionIsAlreadyOpen, null);
+                return false;
             }
         }
 
-        public override async Task<VoidResult<SocketOperationStatus>> Stop()
+        public override async Task<bool> Stop()
         {
             await Task.Yield();
             if (!IsActive)
             {
                 ConnectionProvider.ListenerStopped(this);
-                return new VoidResult<SocketOperationStatus>(SocketOperationStatus.Success, null);
+                return true;
             }
             else
             {
-                return new VoidResult<SocketOperationStatus>(SocketOperationStatus.ListenerIsAlreadyClosed, null);
+                return false;
             }
         }
     }

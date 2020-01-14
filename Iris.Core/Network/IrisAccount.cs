@@ -157,8 +157,8 @@ namespace Iris.Core.Network
             StandardHeader msg = new StandardHeader()
             {
                 Message = message,
-                Sender = connection.LocalPoint,
-                Recipient = connection.RemotePoint,
+                Sender = connection.LocalPoint as IrisAccessPoint,
+                Recipient = connection.RemotePoint as IrisAccessPoint,
                 IsConnection = true
             };
             RawCommunications[msg.Recipient.Address][Random.Next(RawCommunications[msg.Recipient.Address].Count)].Send(Serializer.Serialize(msg));

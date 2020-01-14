@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using EmptyBox.IO.Network.Bluetooth.Classic;
 
 namespace Iris.Core.Network
 {
@@ -29,7 +30,7 @@ namespace Iris.Core.Network
         private readonly List<IConnectionProvider> RawConnectionProviders = new List<IConnectionProvider>();
         private readonly List<ISocket> RawSockets = new List<ISocket>();
         private readonly List<ISocketProvider> RawSocketProviders = new List<ISocketProvider>();
-        private readonly List<IDeviceProvider<IDevice>> DeviceProviders = new List<IDeviceProvider<IDevice>>();
+        private readonly List<IDeviceSearcher<IDevice>> DeviceProviders = new List<IDeviceSearcher<IDevice>>();
         private readonly List<IrisAccount> Accounts = new List<IrisAccount>();
         private readonly uint STANDARD_HEADER_SIZE;
 
@@ -71,38 +72,33 @@ namespace Iris.Core.Network
             }
             #endregion
             #region Searchers init
-            foreach(IDeviceProvider<IDevice> provider in DeviceProviders)
+            foreach(IDeviceSearcher<IDevice> provider in DeviceProviders)
             {
                 provider.DeviceFound += Provider_DeviceFound;
                 provider.DeviceLost += Provider_DeviceLost;
-                VoidResult<AccessStatus> status = await provider.StartWatcher();
+                await provider.ActivateSearcher();
             }
             #endregion
         }
 
-        private void Provider_DeviceLost(IDeviceProvider<IDevice> provider, IDevice device)
+        private void Provider_DeviceLost(IDeviceSearcher<IDevice> provider, IDevice device)
         {
             
         }
 
-        private async void Provider_DeviceFound(IDeviceProvider<IDevice> provider, IDevice device)
+        private async void Provider_DeviceFound(IDeviceSearcher<IDevice> provider, IDevice device)
         {
             switch (device)
             {
                 case IBluetoothDevice btDevice:
-                    RefResult<IEnumerable<BluetoothAccessPoint>, AccessStatus> result = await btDevice.GetRFCOMMServices(BluetoothSDPCacheMode.Uncached);
-                    if (result.Status == AccessStatus.Success)
+                    IEnumerable<BluetoothClassicAccessPoint> services = await btDevice.GetClassicServices(BluetoothSDPCacheMode.Uncached);
+                    BluetoothClassicAccessPoint irisService = services.FirstOrDefault(x => x.Port == BLUETOOTH_SERVICE_ID);
+                    if (irisService.Address != null)
                     {
-                        IEnumerable<BluetoothAccessPoint> services = result.Result.ToList();
-                        BluetoothAccessPoint irisService = services.FirstOrDefault(x => x.Port == BLUETOOTH_SERVICE_ID);
-                        if (irisService.Address != null)
+                        IConnection connection = (provider as IBluetoothAdapter).CreateConnection(irisService);
+                        if (await connection.Open())
                         {
-                            IConnection connection = (provider as IBluetoothAdapter).CreateConnection(irisService);
-                            var status = await connection.Open();
-                            if (status.Status == SocketOperationStatus.Success)
-                            {
-                                await AddConnection(connection);
-                            }
+                            await AddConnection(connection);
                         }
                     }
                     break;
@@ -194,8 +190,7 @@ namespace Iris.Core.Network
                 Recipient = (IrisAddress.MulticastAddress, Route.Port),
                 Message = Serializer.Serialize(new Route.ServiceDetectionPacket() { Purpose = Route.ServiceDetectionPurpose.Expansion })
             };
-            var status = await connection.Send(Serializer.Serialize(question));
-            if (status.Status == SocketOperationStatus.Success)
+            if (await connection.Send(Serializer.Serialize(question)))
             {
                 RawConnections.Add(connection);
                 return true;

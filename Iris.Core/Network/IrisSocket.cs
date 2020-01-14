@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Iris.Core.Network
 {
-    public sealed class IrisSocket : APointedSocket<IrisAddress, IrisPort, IrisAccessPoint, IrisAccount>
+    public sealed class IrisSocket : APointedSocket<IrisAddress, IrisPort, IrisAccount>
     {
         internal event PointedSocketMessageReceiveHandler<IrisAddress, IrisPort> MessageSended;
 
@@ -23,35 +23,35 @@ namespace Iris.Core.Network
             OnMessageReceive(sender, message);
         }
 
-        public async override Task<VoidResult<SocketOperationStatus>> Close()
+        public async override Task<bool> Close()
         {
             IsActive = false;
             SocketProvider.SocketClosed(this);
-            return new VoidResult<SocketOperationStatus>(SocketOperationStatus.Success, null);
+            return true;
         }
 
-        public async override Task<VoidResult<SocketOperationStatus>> Open()
+        public async override Task<bool> Open()
         {
             await Task.Yield();
             if (SocketProvider.SocketOpened(this))
             {
                 IsActive = true;
-                return new VoidResult<SocketOperationStatus>(SocketOperationStatus.Success, null);
+                return true;
             }
             else
             {
-                return new VoidResult<SocketOperationStatus>(SocketOperationStatus.UnknownError, null);
+                return false;
             }
         }
 
-        public async Task<VoidResult<SocketOperationStatus>> Send(IAccessPoint<IrisAddress, IrisPort> receiver, byte[] data)
+        public async Task<bool> Send(IAccessPoint<IrisAddress, IrisPort> receiver, byte[] data)
         {
             await Task.Yield();
             MessageSended?.Invoke(this, receiver, data);
-            return new VoidResult<SocketOperationStatus>(SocketOperationStatus.Success, null);
+            return true;
         }
 
-        public async override Task<VoidResult<SocketOperationStatus>> Send(IAccessPoint<IAddress, IPort> receiver, byte[] data)
+        public async override Task<bool> Send(IAccessPoint<IAddress, IPort> receiver, byte[] data)
         {
             return await Send(receiver as IAccessPoint<IrisAddress, IrisPort>, data);
         }

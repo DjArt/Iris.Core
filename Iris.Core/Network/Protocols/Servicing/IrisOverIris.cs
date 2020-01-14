@@ -151,8 +151,7 @@ namespace Iris.Core.Network.Protocols.Servicing
                 }
 
                 IrisConnection conn = Account.CreateConnection(new IrisAccessPoint(local, Port));
-                var status = await conn.Open();
-                if (status.Status == SocketOperationStatus.Success)
+                if (await conn.Open())
                 {
                     RelayRequestPacket requset = new RelayRequestPacket()
                     {
@@ -161,8 +160,7 @@ namespace Iris.Core.Network.Protocols.Servicing
                         TTL = ttl
                     };
                     Task<(RelayRequestAnswerPacket Value, bool Success)> answerTask = Task.Run(() => conn.WaitAnswer<RelayRequestAnswerPacket>(CheckAnswer, Route.AnswerDelay + Route.AnswerDelay));
-                    Task<VoidResult<SocketOperationStatus>> statusTask = conn.Send(Serializer.Serialize(requset));
-                    if ((await statusTask).Status == SocketOperationStatus.Success)
+                    if (await conn.Send(Serializer.Serialize(requset)))
                     {
                         var answer = await answerTask;
                         if (answer.Success && answer.Value.TTL != null)
